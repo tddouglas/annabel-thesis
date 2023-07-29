@@ -13,10 +13,8 @@ np.set_printoptions(threshold=sys.maxsize)
 INPUTS_DATA = "data/inputs/sheet1_green_inputs_revised.csv"
 EXPORTS_DATA = "data/exports/sheet2_green_exports_revised.csv"
 
-TEST_DATA = "data/inputs/test_run.csv"
 
-
-def log_regression(dataset_filenames):
+def log_regression(dataset_filenames, predict_file, single_variable):
     dataframes = [open_file(filename) for filename in dataset_filenames]
 
     inputs_data = pd.concat(dataframes, axis=1, join='outer')  # Combine all provided files into a single dataframe
@@ -25,6 +23,8 @@ def log_regression(dataset_filenames):
     # Clean input and split data into training data and test data
     x = inputs_data.drop(columns=['Swap Recipient'])  # Features (all material columns as predictors)
     y = inputs_data['Swap Recipient']  # Target variable (currency swap, 1: Yes, 0: No)
+    if single_variable != '':
+        x = x.loc[:, [single_variable]]
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
     # Standardize data to improve model runtime
@@ -32,9 +32,9 @@ def log_regression(dataset_filenames):
     x_train = scaler.fit_transform(x_train)
     x_test = scaler.transform(x_test)
 
-    # Create model and train it
-    model = LogisticRegression(solver='liblinear', C=0.05, multi_class='ovr',
-                               random_state=0)
+    # [Create model](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) and train it
+    # For multiclass problems, only ‘newton-cg’, ‘sag’, ‘saga’ and ‘lbfgs’ handle multinomial loss
+    model = LogisticRegression(solver='liblinear', C=0.05, multi_class='auto', penalty='l2')
     model.fit(x_train, y_train)
 
     # Evaluate Model
@@ -50,13 +50,8 @@ def log_regression(dataset_filenames):
     print(f"Recall: {recall}")
     print(f"F1-score: {f1}")
 
-    train_score = model.score(x_train, y_train)
-    test_score = model.score(x_test, y_test)
-    print(f"Training score {train_score}")
-    print(f"Test score {test_score}\n")
-
     # Take test data from file and predict likelihood of currency swap
-    predict(TEST_DATA, scaler, model)
+    predict(predict_file, scaler, model)
 
 
 # Calculate the likelihood for new data points with scaled features assuming data is in same format as x_train
@@ -68,6 +63,35 @@ def predict(filename, scaler, model):
     for index, row in data_to_predict.iterrows():
         int_index = data_to_predict.index.get_loc(index)
         print(f"{row.to_string()}\nProbability of receiving a currency swap: {probability_of_swap[int_index]}\n")
+
+
+# TODO: Implement plot for single variable. Currently single variable is not working
+def plot(single_variable):
+    # Step 5: Plot the decision boundary and the data points
+    # Note: As mentioned earlier, directly plotting the decision boundary for multiple features is not straightforward.
+    # We can plot the contour plot to visualize the decision boundary and probabilities.
+
+    # Define a meshgrid to plot the contour
+    h = 0.01  # Step size in the mesh
+    x_min, x_max = X_train.iloc[:, 0].min() - 1, X_train.iloc[:, 0].max() + 1
+    y_min, y_max = X_train.iloc[:, 1].min() - 1, X_train.iloc[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+
+    # Get predicted probabilities for the meshgrid
+    Z = model.predict_proba(np.c_[xx.ravel(), yy.ravel()])[:, 1]
+    Z = Z.reshape(xx.shape)
+
+    # Plot the contour plot
+    plt.contourf(xx, yy, Z, cmap=plt.cm.RdBu, alpha=0.8)
+
+    # Plot the training data points
+    plt.scatter(X_train.iloc[:, 0], X_train.iloc[:, 1], c=y_train, cmap=plt.cm.RdBu, edgecolors='k')
+
+    plt.xlabel(single_variable)
+    plt.ylabel('Predict Probability of receiving a swap')
+    plt.title('Logistic Regression Decision Boundary')
+    plt.colorbar()
+    plt.show()
 
 
 # Converter used when importing Pandas data set to turn string percentage columns -> floats
@@ -97,5 +121,12 @@ def open_file(filename):
 
 
 if __name__ == '__main__':
-    files = [INPUTS_DATA]  # List of Datasets to include in logit
-    log_regression(files)
+    # List of prepared runtypes and their corresponding test file
+    combined_run = ([INPUTS_DATA, EXPORTS_DATA], 'data/test_run.csv', '')
+    inputs_run = ([INPUTS_DATA], 'data/inputs/test_run.csv', '')
+    single_variable_manganese_run = ([INPUTS_DATA], 'data/inputs/test_run_manganese.csv', 'Manganese Ore')
+    export_run = ([EXPORTS_DATA], 'data/exports/test_run.csv', '')
+
+    # Select one of the runtypes above and add as an argument to the log_regression function
+    # after the * to run the model on it
+    log_regression(*combined_run)
