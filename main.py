@@ -12,12 +12,13 @@ from sklearn.preprocessing import StandardScaler
 np.set_printoptions(threshold=sys.maxsize)
 INPUTS_DATA = "data/inputs/sheet1_green_inputs_revised.csv"
 EXPORTS_DATA = "data/exports/sheet2_green_exports_revised.csv"
+CONTROLS_DATA = "data/controls/controls_master.csv"
 
 
 def log_regression(dataset_filenames, predict_file, single_variable):
     dataframes = [open_file(filename) for filename in dataset_filenames]
 
-    inputs_data = pd.concat(dataframes, axis=1, join='outer')  # Combine all providefiles into a single dataframe
+    inputs_data = pd.concat(dataframes, axis=1, join='inner')  # Combine all providefiles into a single dataframe
     inputs_data = inputs_data.loc[:, ~inputs_data.columns.duplicated()]  # Remove duplicate column 'Swap Recipient'
 
     # Clean input and split data into training data and test data
@@ -41,7 +42,7 @@ def log_regression(dataset_filenames, predict_file, single_variable):
     y_pred = model.predict(x_test)
 
     # Calculate accuracy, precision, recall, and F1-score (optional)
-    accuracy = accuracy_score(y_test, y_pred)
+    accuracy = accuracy_score(y_test, y_pred, normalize=False)
     precision = precision_score(y_test, y_pred)
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
@@ -50,8 +51,13 @@ def log_regression(dataset_filenames, predict_file, single_variable):
     print(f"Recall: {recall}")
     print(f"F1-score: {f1}")
 
+    # Print test swap results vs model prediction data
+    s = pd.Series(y_pred).set_axis(y_test.index)
+    pred_test_compare = pd.concat([y_test, s], axis=1)
+    print(f"y_test vs. y_pred results:\n{pred_test_compare.set_axis(['y_test', 'y_pred'], axis=1)}")
+
     # Take test data from file and predict likelihood of currency swap
-    predict(predict_file, scaler, model)
+    # predict(predict_file, scaler, model)
 
 
 # Calculate the likelihood for new data points with scaled features assuming data is in same format as x_train
@@ -98,6 +104,9 @@ def plot(single_variable):
 def p2f(x):
     if x == '-':
         return float(0)
+    elif x == '':
+        print("Converting null to float")
+        return float(0)
     else:
         return float(x.strip('%')) / 100
 
@@ -109,23 +118,26 @@ def open_file(filename):
                          "Artificial Graphite": p2f, "Lithium Oxide": p2f, "Silicon": p2f,
                          "Semiconductor devices": p2f, "Electric motors": p2f, "Electric parts": p2f,
                          "Secondary batteries": p2f, "Steam turbines": p2f, "Hydraulic turbines": p2f,
-                         "Gas turbines": p2f, "Electrolysers": p2f}
+                         "Gas turbines": p2f, "Electrolysers": p2f,
+                         "Max Inflation Rate": p2f, "Min Government Net Lending-Borrowing Ratio": p2f,
+                         "Total Exports to China": p2f, "Total Imports from China": p2f}
+    datatype_mapping = {"Country Name": "string", "Swap Recipient": int,
+                        "GDP Per Capita": float, "Geographic proximity to China": float, "Population Size": float}
     try:
         with open(filename, 'r', encoding='utf-8-sig') as f:
-            return pd.read_csv(f, dtype={"Country Name": "string"}, converters=converter_mapping,
+            return pd.read_csv(f, dtype=datatype_mapping, converters=converter_mapping,
                                index_col="Country Name")
-    # except KeyError as e:
-    #     print(f"Key Error {str(e)}")
     finally:
         f.close()
 
 
 if __name__ == '__main__':
     # List of prepared runtypes and their corresponding test file
-    combined_run = ([INPUTS_DATA, EXPORTS_DATA], 'data/test_run.csv', '')
+    combined_run = ([INPUTS_DATA, EXPORTS_DATA, CONTROLS_DATA], 'data/test_run.csv', '')
     inputs_run = ([INPUTS_DATA], 'data/inputs/test_run.csv', '')
     single_variable_manganese_run = ([INPUTS_DATA], 'data/inputs/test_run_manganese.csv', 'Manganese Ore')
     export_run = ([EXPORTS_DATA], 'data/exports/test_run.csv', '')
+    controls_run = ([CONTROLS_DATA], '', '')
 
     # Select one of the runtypes above and add as an argument to the log_regression function
     # after the * to run the model on it

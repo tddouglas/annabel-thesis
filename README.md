@@ -1,3 +1,10 @@
+## Goal
+Scrapped detailed dataset relating to independent variables of raw material exports by country, strategic electrical exports by country, and several control variables around GDP Per Capita (in current USD),Max Inflation Rate (as %),Min Government Net Lending - Borrowing Ratio (% of GDP),Total Exports to China (as % of China's total imports),Total Imports from China (as % of China's total exports), Geographic proximity to China (in miles), and Population Size (in millions), 
+
+The goal is to run a multivariable logistical regression model against the data provided to assess the correlation between the probability of receiving a currency swap from China against the above factors. Ideally we want to use this regression analysis to answer the below 2 questions:
+1. What is the probability of a country receiving a swap if they export at least 5% of any critical green input globally?
+2. What is the probability of a country receiving a swap given how much of a critical green export they buy from China?
+
 ## Analysis
 We've implemented this using [SkLearn's Logistic Regression](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) function. 
 
@@ -5,15 +12,22 @@ We've chosen the `liblinear` solver as it uses a "[One-vs-Rest](https://refactor
 
 We've chosen low `C` values and an "l2" `penalty` as the dataset is inherently small (limited to # of countries). These choices attempt to address overfitting at a slight penalty to test accuracy. 
 
+For the control dataset, we're missing data for Virgin Islands, Turks and Caicos, Saint Martin, Northern Mariana Islands, Democratic People's republic of Korea, Isle of Man, Guam, Greenland, Gibralter, French Polynesia, Faroe Islands, Curacao, Channel Islands, Cayman Islands, British Virgin Islands, Bermuda, and American Samoa. Meaning our dataset should incorporate only 182 countries
 
-## Goal
-Scrapped detailed dataset relating to independent variables of raw material exports by country, strategic electrical exports by country, and several control variables around GDP, Inflation,  
-Attached is my dataset. Only the first two tabs really matter. I have controls in the final few tabs but I figured for now I’ll leave them be, considering I can’t even figure out how to run a test with just independent variables.
- 
-The only positive progress I made was when I isolated independent variables (in the case of the two graphs below, first Manganese Ore and then Copper Ore). When I tried to pull in multiple independent variables the tests would stop working. Ultimately I have two questions: “What is the probability of a country receiving a swap if they export at least 5% of any critical green input globally?” and, “What is the probability of a country receiving a swap given how much of a critical green export they buy from China?”. The two first ‘master’ tabs have all the data, if I could only figure out how to run it..
+Annabel's initial analysis isolated individual, independent variables and ran a single variable logistical analysis against the below 2 minerals. 
 
+Manganese Ore:
 ![](static/image001.png)
+Copper Ore:
 ![](static/image002.png)
 
-Tyler Notes:
+## Evaluation
+We will evaluate the model with some standard linear regression metrics which are built into the sklearn library
+- [Accuracy](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html#sklearn.metrics.accuracy_score) = The set of labels (both 0 and 1) predicted correctly
+- [Precision](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_score.html#sklearn.metrics.precision_score) = The precision is the ratio tp / (tp + fp) where tp is the number of true positives and fp the number of false positives. The precision is intuitively the ability of the classifier not to label as positive a sample that is negative. 
+- [Recall](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.recall_score.html#sklearn.metrics.recall_score) = The recall is the ratio tp / (tp + fn) where tp is the number of true positives and fn the number of false negatives. The recall is intuitively the ability of the classifier to find all the positive samples.
+- [F1-score](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html#sklearn.metrics.f1_score) = The F1 score can be interpreted as a harmonic mean of the precision and recall, where an F1 score reaches its best value at 1 and worst score at 0. The relative contribution of precision and recall to the F1 score are equal. The formula for the F1 score is: `F1 = 2 * (precision * recall) / (precision + recall)`
+
+
+## Other notes:
 - Removed commas from country names to allow CSV file to work
