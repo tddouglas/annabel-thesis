@@ -17,7 +17,7 @@ EXPORTS_DATA = "data/exports/sheet2_green_exports_revised.csv"
 def log_regression(dataset_filenames, predict_file, single_variable):
     dataframes = [open_file(filename) for filename in dataset_filenames]
 
-    inputs_data = pd.concat(dataframes, axis=1, join='outer')  # Combine all provided files into a single dataframe
+    inputs_data = pd.concat(dataframes, axis=1, join='outer')  # Combine all providefiles into a single dataframe
     inputs_data = inputs_data.loc[:, ~inputs_data.columns.duplicated()]  # Remove duplicate column 'Swap Recipient'
 
     # Clean input and split data into training data and test data
@@ -32,7 +32,7 @@ def log_regression(dataset_filenames, predict_file, single_variable):
     x_train = scaler.fit_transform(x_train)
     x_test = scaler.transform(x_test)
 
-    # [Create model](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) and train it
+    # Create Model
     # For multiclass problems, only ‘newton-cg’, ‘sag’, ‘saga’ and ‘lbfgs’ handle multinomial loss
     model = LogisticRegression(solver='liblinear', C=0.05, multi_class='auto', penalty='l2')
     model.fit(x_train, y_train)
