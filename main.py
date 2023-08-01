@@ -1,68 +1,62 @@
 #!/usr/bin/python3
 import sys
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score, \
     f1_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer, StandardScaler, MinMaxScaler, PowerTransformer, MaxAbsScaler, LabelEncoder
+
+from model_tester import optimize_params, evaluate_model
+from open_file import open_csv
 
 np.set_printoptions(threshold=sys.maxsize)
-INPUTS_DATA = "data/inputs/sheet1_green_inputs_revised.csv"
-EXPORTS_DATA = "data/exports/sheet2_green_exports_revised.csv"
-CONTROLS_DATA = "data/controls/controls_master.csv"
+INPUTS_DATA = "data/inputs/imports.csv"
+EXPORTS_DATA = "data/exports/exports.csv"
+CONTROLS_DATA = "data/controls/controls.csv"
 
 
-def log_regression(dataset_filenames, predict_file, single_variable):
-    dataframes = [open_file(filename) for filename in dataset_filenames]
+def create_dataset(dataset_filenames, single_variable):
+    dataframes = [open_csv(filename) for filename in dataset_filenames]
+    if len(dataset_filenames) > 1:
+        inputs_data = pd.concat(dataframes, axis=1, join='inner')
+        inputs_data = inputs_data.loc[:, ~inputs_data.columns.duplicated()]  # Remove duplicate column 'Swap Recipient'
+    else:
+        inputs_data = dataframes[0]
 
-    inputs_data = pd.concat(dataframes, axis=1, join='inner')  # Combine all providefiles into a single dataframe
-    inputs_data = inputs_data.loc[:, ~inputs_data.columns.duplicated()]  # Remove duplicate column 'Swap Recipient'
-
-    # Clean input and split data into training data and test data
-    x = inputs_data.drop(columns=['Swap Recipient'])  # Features (all material columns as predictors)
+    # Clean input and split data into independent and dependent variables (x and y)
+    x = inputs_data.drop(columns=['Swap Recipient'])
     y = inputs_data['Swap Recipient']  # Target variable (currency swap, 1: Yes, 0: No)
     if single_variable != '':
         x = x.loc[:, [single_variable]]
+
+    return x, y
+
+
+# Single model run against best performing model
+def run_model(x, y):
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
-    # Standardize data to improve model runtime
-    scaler = StandardScaler()
-    x_train = scaler.fit_transform(x_train)
-    x_test = scaler.transform(x_test)
+    # Run best performing pipeline from optimization run
+    pipe = Pipeline(steps=[('scaler', StandardScaler()),
+                           ('classifier', RandomForestClassifier(n_estimators=100))])
+    pipe.fit(x_train, y_train)
 
-    # Create Model
-    # For multiclass problems, only ‘newton-cg’, ‘sag’, ‘saga’ and ‘lbfgs’ handle multinomial loss
-    model = LogisticRegression(solver='liblinear', C=0.05, multi_class='auto', penalty='l2')
-    model.fit(x_train, y_train)
-
-    # Evaluate Model
-    y_pred = model.predict(x_test)
-
-    # Calculate accuracy, precision, recall, and F1-score (optional)
-    accuracy = accuracy_score(y_test, y_pred, normalize=False)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    print(f"Accuracy: {accuracy}")
-    print(f"Precision: {precision}")
-    print(f"Recall: {recall}")
-    print(f"F1-score: {f1}")
-
-    # Print test swap results vs model prediction data
-    s = pd.Series(y_pred).set_axis(y_test.index)
-    pred_test_compare = pd.concat([y_test, s], axis=1)
-    print(f"y_test vs. y_pred results:\n{pred_test_compare.set_axis(['y_test', 'y_pred'], axis=1)}")
-
-    # Take test data from file and predict likelihood of currency swap
-    # predict(predict_file, scaler, model)
+    evaluate_model(pipe, x_test, y_test)
+    return pipe
 
 
 # Calculate the likelihood for new data points with scaled features assuming data is in same format as x_train
 def predict(filename, scaler, model):
-    data_to_predict = open_file(filename)
+    data_to_predict = open_csv(filename)
     scaled_data = scaler.transform(data_to_predict)
     probability_of_swap = model.predict_proba(scaled_data)[:, 1]  # Probability of receiving a currency swap (class 1)
 
@@ -71,74 +65,26 @@ def predict(filename, scaler, model):
         print(f"{row.to_string()}\nProbability of receiving a currency swap: {probability_of_swap[int_index]}\n")
 
 
-# TODO: Implement plot for single variable. Currently single variable is not working
-def plot(single_variable):
-    # Step 5: Plot the decision boundary and the data points
-    # Note: As mentioned earlier, directly plotting the decision boundary for multiple features is not straightforward.
-    # We can plot the contour plot to visualize the decision boundary and probabilities.
-
-    # Define a meshgrid to plot the contour
-    h = 0.01  # Step size in the mesh
-    x_min, x_max = X_train.iloc[:, 0].min() - 1, X_train.iloc[:, 0].max() + 1
-    y_min, y_max = X_train.iloc[:, 1].min() - 1, X_train.iloc[:, 1].max() + 1
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-
-    # Get predicted probabilities for the meshgrid
-    Z = model.predict_proba(np.c_[xx.ravel(), yy.ravel()])[:, 1]
-    Z = Z.reshape(xx.shape)
-
-    # Plot the contour plot
-    plt.contourf(xx, yy, Z, cmap=plt.cm.RdBu, alpha=0.8)
-
-    # Plot the training data points
-    plt.scatter(X_train.iloc[:, 0], X_train.iloc[:, 1], c=y_train, cmap=plt.cm.RdBu, edgecolors='k')
-
-    plt.xlabel(single_variable)
-    plt.ylabel('Predict Probability of receiving a swap')
-    plt.title('Logistic Regression Decision Boundary')
-    plt.colorbar()
-    plt.show()
-
-
-# Converter used when importing Pandas data set to turn string percentage columns -> floats
-def p2f(x):
-    if x == '-':
-        return float(0)
-    elif x == '':
-        print("Converting null to float")
-        return float(0)
-    else:
-        return float(x.strip('%')) / 100
-
-
-# Helper to open file and convert to Pandas DataFrame
-def open_file(filename):
-    converter_mapping = {"Manganese Ore": p2f, "Copper Ore": p2f, "Nickel Ore": p2f, "Cobalt Ore": p2f, "Zinc Ore": p2f,
-                         "Chromium Ore": p2f, "Molybdenum Ore": p2f, "Rare Earth Metals": p2f, "Natural Graphite": p2f,
-                         "Artificial Graphite": p2f, "Lithium Oxide": p2f, "Silicon": p2f,
-                         "Semiconductor devices": p2f, "Electric motors": p2f, "Electric parts": p2f,
-                         "Secondary batteries": p2f, "Steam turbines": p2f, "Hydraulic turbines": p2f,
-                         "Gas turbines": p2f, "Electrolysers": p2f,
-                         "Max Inflation Rate": p2f, "Min Government Net Lending-Borrowing Ratio": p2f,
-                         "Total Exports to China": p2f, "Total Imports from China": p2f}
-    datatype_mapping = {"Country Name": "string", "Swap Recipient": int,
-                        "GDP Per Capita": float, "Geographic proximity to China": float, "Population Size": float}
-    try:
-        with open(filename, 'r', encoding='utf-8-sig') as f:
-            return pd.read_csv(f, dtype=datatype_mapping, converters=converter_mapping,
-                               index_col="Country Name")
-    finally:
-        f.close()
-
-
 if __name__ == '__main__':
-    # List of prepared runtypes and their corresponding test file
-    combined_run = ([INPUTS_DATA, EXPORTS_DATA, CONTROLS_DATA], 'data/test_run.csv', '')
-    inputs_run = ([INPUTS_DATA], 'data/inputs/test_run.csv', '')
-    single_variable_manganese_run = ([INPUTS_DATA], 'data/inputs/test_run_manganese.csv', 'Manganese Ore')
-    export_run = ([EXPORTS_DATA], 'data/exports/test_run.csv', '')
-    controls_run = ([CONTROLS_DATA], '', '')
+    # List of prepared input file combos
+    inputs = [INPUTS_DATA]
+    export = [EXPORTS_DATA]
+    controls_run = [CONTROLS_DATA]
+    inputs_control = [INPUTS_DATA, CONTROLS_DATA]
+    exports_control = [EXPORTS_DATA, CONTROLS_DATA]
+    combined_run = [INPUTS_DATA, EXPORTS_DATA, CONTROLS_DATA]
 
-    # Select one of the runtypes above and add as an argument to the log_regression function
-    # after the * to run the model on it
-    log_regression(*combined_run)
+    # Select one of the above file combos. Pass in a single column header as the second param if you want to
+    # Run in "Single File Mode" only evaluating that column from the dataset
+    x, y = create_dataset(inputs_control, '')
+
+    if len(sys.argv) > 1:
+        optimize = sys.argv[1]
+        if optimize == 'optimize':
+            optimize_params(x, y)
+    else:
+        # Run Best Model as output from optimize run above
+        pipe = run_model(x, y)
+
+        # Take test data from file and predict likelihood of currency swap
+        # predict('data/test_run.csv', pipe)
