@@ -6,11 +6,9 @@ The goal is to run a multivariable logistical regression model against the data 
 2. What is the probability of a country receiving a swap given how much of a critical green export they buy from China?
 
 ## Analysis
-We've implemented this using [SkLearn's Logistic Regression](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) function. 
+We've implemented this using [SkLearn's Random Forest Classifier](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html) function. 
 
-We've chosen the `liblinear` solver as it uses a "[One-vs-Rest](https://refactored.ai/microcourse/notebook?path=content%2F06-Classification_models_in_Machine_Learning%2F02-Multivariate_Logistic_Regression%2Fmulticlass_logistic-regression.ipynb#1.-One-Vs-Rest-(OVR))" scheme evaluating each independent variable individually. Given the importance a single material exports can have to a nation, it is best to choose a solver utilizing this OVR scheme.
-
-We've chosen low `C` values and an "l2" `penalty` as the dataset is inherently small (limited to # of countries). These choices attempt to address overfitting at a slight penalty to test accuracy. 
+We've chosen the this classifier as it performed best in our testing over multiple inputs.
 
 For the control dataset, we're missing data for Virgin Islands, Turks and Caicos, Saint Martin, Northern Mariana Islands, Democratic People's republic of Korea, Isle of Man, Guam, Greenland, Gibralter, French Polynesia, Faroe Islands, Curacao, Channel Islands, Cayman Islands, British Virgin Islands, Bermuda, and American Samoa. Meaning our dataset should incorporate only 182 countries
 
